@@ -71,6 +71,28 @@ TUN 模式已恢复，网页和桌面端能正常加载 B 站首页、UP主头�
 3. 打开 Clash Verge Rev 的 **“代理”** 页面，找到 **`🇨🇳 国内网站`** 策略组，切换回 **`DIRECT`**；
 4. 强制刷新网页（`Ctrl + F5`）或在桌面端重新点击视频即可恢复。
 
+## 常见分支问题：TUN 模式下节点全部 Timeout、网络卡顿，切回系统代理恢复
+
+### 症状
+开启 TUN 模式后，Clash Verge 面板中**所有代理节点测速全部显示 Timeout（超时报红）**，访问国内外网页均极其卡顿或无法连接；但一旦切回“系统代理模式”，所有节点测速立刻恢复成正常的几毫秒至几十毫秒，网络恢复。
+
+### 根因
+1. **O+ Connect 后台静默重开转发**：虽然此前通过脚本关闭了物理网卡的 IPv4 转发，但 O+ Connect 后台服务（`O+Connect Service`）在设备心跳、重连或休眠唤醒时，会以 SYSTEM 权限重新将物理网卡的 IPv4 `Forwarding` 设为 `Enabled`；
+2. **`mixed` 堆栈发生路由死循环**：在默认的 `stack: mixed` 模式下，Mihomo 尝试直连代理节点服务器的握手包，被 Windows 的 IP 转发机制重新抓回了 TUN / `vgate0` 虚拟网卡中，触发 `reject loopback connection` 回环阻断，导致内核根本无法连通任何代理服务器；
+3. **切回系统代理恢复的原因**：系统代理模式彻底卸载了 TUN 虚拟网卡及其接管的 `0.0.0.0/1` 路由，内核直接通过普通 Socket 与远端节点通信，绕过了虚拟网卡回环。
+
+### 根治与防护
+1. **彻底免疫方案（推荐）**：
+   在 Clash Verge Rev 的 **设置 → 虚拟网卡模式（TUN）右侧齿轮** 中，将 **堆栈模式（Stack）** 从默认的 `mixed` 改为 **`gvisor`**。
+   * **原理**：`gvisor` 是 Google 开发的用户态网络协议栈，在应用内存中自闭环拼装数据包，不依赖 Windows 内核底层转发逻辑，即使物理网卡开启转发也不会被卷入回环死锁。
+2. **应急恢复**：
+   以管理员身份在 PowerShell 运行脚本重新关闭物理网卡转发：
+   ```powershell
+   .\scripts\Set-Forwarding.ps1 -Action Disable -InterfaceAlias "以太网"
+   ```
+3. **减少干扰**：
+   长时间使用 TUN 时建议退出 O+ Connect 客户端，并关闭 Wi-Fi 避免与以太网争抢默认路由。
+
 ## 诊断边界
 
 - 若 TUN 模式仍全网断开，不能仅凭浏览器的 `ERR_CONNECTION_CLOSED` 判断是 DNS、路由、自回环还是防火墙。应检查 Clash 核心日志中是否出现 `reject loopback connection`、`interface not found` 或 DNS 解析错误。
