@@ -1,0 +1,12 @@
+state/
+*.log
+*.tmp
+.env
+.env.*
+node_modules/
+
+# Never publish Clash subscriptions, generated configurations, or credentials.
+clash-verge.yaml
+config.yaml
+profiles/
+subscriptions/
