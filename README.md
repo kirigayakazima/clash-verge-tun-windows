@@ -55,6 +55,22 @@
 
    如果转发是你在使用本项目脚本之前手动关闭的，本项目没有它的备份；请先确认原值，再手动恢复。本案例原值是 `Enabled`。
 
+## 常见分支问题：国内流媒体/B站“首页能开但视频黑屏打不开”
+
+### 症状
+TUN 模式已恢复，网页和桌面端能正常加载 B 站首页、UP主头像、评论和标题，但点进具体视频后播放器区域黑屏，并显示小电视图标“你感兴趣的视频都在B站”加载失败。
+
+### 根因
+- B 站业务接口走 `*.bilibili.com`，被直连规则放行；
+- 但底层的音视频切片流走独立 CDN `*.bilivideo.com`、`*.bilivideo.cn`，属于 `🇨🇳 国内网站` 策略组；
+- 若在 Clash Verge Rev 的“代理”面板中误将 `🇨🇳 国内网站` 切换成了代理节点（如日本节点），国内视频 CDN 对海外节点会产生丢包、超时或阻断，导致播放器拉不到切片报错。
+
+### 快速排查与解决
+1. 运行 `.\scripts\Get-TunStatus.ps1`，脚本会自动检查并预警 `profiles.yaml` 中 `国内网站` 是否偏离了 `DIRECT`；
+2. 也可运行 `.\scripts\Test-Connectivity.ps1` 查看 `Domestic video CDN status` 是否正常直接连通；
+3. 打开 Clash Verge Rev 的 **“代理”** 页面，找到 **`🇨🇳 国内网站`** 策略组，切换回 **`DIRECT`**；
+4. 强制刷新网页（`Ctrl + F5`）或在桌面端重新点击视频即可恢复。
+
 ## 诊断边界
 
 - 若 TUN 模式仍全网断开，不能仅凭浏览器的 `ERR_CONNECTION_CLOSED` 判断是 DNS、路由、自回环还是防火墙。应检查 Clash 核心日志中是否出现 `reject loopback connection`、`interface not found` 或 DNS 解析错误。
