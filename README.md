@@ -79,10 +79,38 @@ TUN 模式已恢复，网页和桌面端能正常加载 B 站首页、UP主头�
 - 若在 Clash Verge Rev 的“代理”面板中误将 `🇨🇳 国内网站` 切换成了代理节点（如日本节点），国内视频 CDN 对海外节点会产生丢包、超时或阻断，导致播放器拉不到切片报错。
 
 ### 快速排查与解决
-1. 运行 `.\scripts\Get-TunStatus.ps1`，脚本会自动检查并预警 `profiles.yaml` 中 `国内网站` 是否偏离了 `DIRECT`；
-2. 也可运行 `.\scripts\Test-Connectivity.ps1` 查看 `Domestic video CDN status` 是否正常直接连通；
+1. 运行 `.\scripts\Get-TunStatus.ps1`，脚本会检查生成规则是否仍引用 `🇨🇳 国内网站`；若仍有引用，再提示订阅记录中该组是否偏离 `DIRECT`。若已用扩展脚本固定规则，则不再仅凭组内选择报警；
+2. 也可运行 `.\scripts\Test-Connectivity.ps1` 查看 CDN 是否有 HTTP 响应；即使返回 `403`，也只能说明服务器有响应，不能证明视频可播放或连接走了直连；
 3. 打开 Clash Verge Rev 的 **“代理”** 页面，找到 **`🇨🇳 国内网站`** 策略组，切换回 **`DIRECT`**；
 4. 强制刷新网页（`Ctrl + F5`）或在桌面端重新点击视频即可恢复。
+
+### 用本地扩展脚本固定国内规则直连
+
+若希望原本指向 `🇨🇳 国内网站` 策略组的规则始终直连，可以用本地脚本将这些规则的出口改成 `DIRECT`，避免组内选择变化影响它们。此方法保留原有规则顺序，不会把国内规则提到广告拦截或其他特例规则之前。
+
+1. 打开 **订阅 → 右键当前订阅 → 扩展脚本**。
+2. 如果当前只是默认的 `return config` 空脚本，用下面的完整代码替换；如果已有自定义逻辑，把其中的 `config.rules = ...` 处理合并到已有 `main` 的 `return config` 前，不要覆盖原逻辑。
+
+   ```javascript
+   function main(config) {
+     config.rules = (config.rules || []).map(rule =>
+       typeof rule === "string"
+         ? rule.replace(
+             /,\s*🇨🇳 国内网站\s*(?=,\s*no-resolve\s*$|$)/,
+             ",DIRECT"
+           )
+         : rule
+     );
+     return config;
+   }
+   ```
+
+3. 保存并重新启用当前订阅，确认生成配置中的对应规则由 `GEOIP,CN,🇨🇳 国内网站` 变为 `GEOIP,CN,DIRECT`，其他原先指向该组的域名规则也应变为 `DIRECT`。
+4. 保留原先在 **扩展覆写配置** 中设置的 `interface-name: 以太网`。固定出口网卡与规则分流是两项设置。
+
+可直接复制的独立示例见 [examples/domestic-direct.js](examples/domestic-direct.js)。本地订阅扩展会在配置生成时应用；更新同一订阅时仍可使用。新建或切换到其他订阅需要为那个订阅另行配置。若策略组名称不同，需同步修改脚本中的名称。
+
+脚本只修改原本指向该组的规则，不保证所有国内站点都能被已有规则识别。组内仍显示代理节点时，也不一定意味着这些规则在走代理，应以生成规则和实际连接记录为准。回退时撤销这段处理并重新启用订阅，再在代理页面选择所需出口。
 
 ## 常见分支问题：TUN 模式下节点全部 Timeout、网络卡顿，切回系统代理恢复
 

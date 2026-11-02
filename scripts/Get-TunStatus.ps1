@@ -37,7 +37,17 @@ foreach ($name in @('verge.yaml', 'clash-verge.yaml')) {
 }
 
 $profilesPath = Join-Path $configDir 'profiles.yaml'
-if (Test-Path -LiteralPath $profilesPath) {
+$generatedPath = Join-Path $configDir 'clash-verge.yaml'
+$usesDomesticGroup = $true
+if (Test-Path -LiteralPath $generatedPath) {
+    $references = @(Select-String -LiteralPath $generatedPath -Encoding UTF8 -Pattern '^\s*-\s*.+,\s*🇨🇳 国内网站\s*(,\s*no-resolve\s*)?$')
+    $usesDomesticGroup = $references.Count -gt 0
+    Write-Output "=== Generated rules: domestic group references = $($references.Count) ==="
+    if (-not $usesDomesticGroup) {
+        Write-Output 'No generated top-level rules target this group; its saved selection alone does not determine routing. Check DIRECT rules and connection records.'
+    }
+}
+if ($usesDomesticGroup -and (Test-Path -LiteralPath $profilesPath)) {
     Write-Output "=== profiles.yaml: domestic group check ==="
     $lines = Get-Content -LiteralPath $profilesPath -Encoding UTF8
     for ($i = 0; $i -lt $lines.Count; $i++) {
@@ -46,7 +56,7 @@ if (Test-Path -LiteralPath $profilesPath) {
             $nowLine = if ($i + 1 -lt $lines.Count) { $lines[$i + 1].Trim() } else { '' }
             Write-Output "  $nameLine | $nowLine"
             if ($nowLine -notmatch 'now:\s*DIRECT\b') {
-                Write-Warning "【警告】'国内网站' 策略组当前未选中 DIRECT！这会导致国内视频流（如 B站 bilivideo）走代理而无法播放/黑屏。"
+                Write-Warning "此订阅记录中的 '国内网站' 未选 DIRECT；请结合当前订阅、生成规则和连接记录确认实际出口，国内视频 CDN 可能受影响。"
             }
         }
     }
