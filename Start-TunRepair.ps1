@@ -1,12 +1,18 @@
-﻿# Windows PowerShell 5.1 / PowerShell 7 interactive entry point.
+# Windows PowerShell 5.1 / PowerShell 7 interactive entry point.
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [ValidateSet('Disable', 'Restore')][string]$Action,
-    [string]$InterfaceAlias
+    [string]$InterfaceAlias,
+    [switch]$Auto
 )
 
 $ErrorActionPreference = 'Stop'
 $script:BackupPath = Join-Path $PSScriptRoot 'state\forwarding-backup.json'
+
+if ($Auto) {
+    & (Join-Path $PSScriptRoot 'scripts\Invoke-AutoRepair.ps1')
+    return
+}
 
 function Get-UplinkChoices {
     $interfaces = @(Get-NetIPInterface -AddressFamily IPv4 -PolicyStore ActiveStore)
@@ -110,22 +116,26 @@ try {
 }
 
 while ($true) {
-    Write-Host "`n1. 修复 / 再次修复转发（自动查询并推荐网卡）"
+    Write-Host "`n1. ⚡ 一键全自动自愈 (推荐：自动选择物理网卡 + 关转发 + 热重载TUN)"
     Write-Host '2. 查看网卡、路由与 Clash 状态（只读）'
-    Write-Host '3. 从备份恢复转发'
-    Write-Host '4. 测试国内外连通性'
-    Write-Host '5. 选择网卡并查看对应 Clash 配置（只读）'
+    Write-Host '3. 手动选择特定网卡修复转发'
+    Write-Host '4. 从备份恢复转发'
+    Write-Host '5. 测试国内外连通性'
+    Write-Host '6. 🚀 安装 Windows 开机静默自愈任务 (彻底免手动)'
+    Write-Host '7. 卸载 Windows 开机自愈任务'
     Write-Host '0. 退出'
     $choice = Read-Host '输入编号'
     try {
         switch ($choice) {
-            '1' { Invoke-Repair $InterfaceAlias }
+            '1' { & (Join-Path $PSScriptRoot 'scripts\Invoke-AutoRepair.ps1') }
             '2' { & (Join-Path $PSScriptRoot 'scripts\Get-TunStatus.ps1') }
-            '3' { Invoke-Restore }
-            '4' { & (Join-Path $PSScriptRoot 'scripts\Test-Connectivity.ps1') }
-            '5' { $name = Select-Uplink; if ($name) { Show-UplinkConfig $name } }
+            '3' { Invoke-Repair $InterfaceAlias }
+            '4' { Invoke-Restore }
+            '5' { & (Join-Path $PSScriptRoot 'scripts\Test-Connectivity.ps1') }
+            '6' { & (Join-Path $PSScriptRoot 'scripts\Install-StartupTask.ps1') }
+            '7' { & (Join-Path $PSScriptRoot 'scripts\Uninstall-StartupTask.ps1') }
             '0' { return }
-            default { Write-Host '请输入 0 到 5。' }
+            default { Write-Host '请输入 0 到 7。' }
         }
     } catch {
         Write-Host ("操作未完成：{0}" -f $_.Exception.Message) -ForegroundColor Red
