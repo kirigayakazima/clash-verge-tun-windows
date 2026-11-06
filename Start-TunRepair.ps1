@@ -1,4 +1,4 @@
-# Windows PowerShell 5.1 / PowerShell 7 interactive entry point.
+﻿# Windows PowerShell 5.1 / PowerShell 7 interactive entry point.
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [ValidateSet('Disable', 'Restore')][string]$Action,

@@ -1,4 +1,4 @@
-# Register Windows Scheduled Task for silent boot & logon self-healing.
+﻿# Register Windows Scheduled Task for silent boot & logon self-healing.
 [CmdletBinding()]
 param()
 
@@ -43,6 +43,7 @@ Register-ScheduledTask -TaskName $taskName `
     -Trigger @($triggerBoot, $triggerLogon) `
     -Principal $taskPrincipal `
     -Settings $settings `
+    -Force `
     -Description 'Clash Verge TUN 模式开机自愈任务：自动检测物理出口、静默关闭转发防回环死锁、确保有线网络与TUN正常。' | Out-Null
 
 Write-Host "`n==================================================" -ForegroundColor Green

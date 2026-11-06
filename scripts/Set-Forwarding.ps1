@@ -1,4 +1,4 @@
-# Temporarily change IPv4 forwarding on one physical adapter, with rollback.
+﻿# Temporarily change IPv4 forwarding on one physical adapter, with rollback.
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(
     [ValidateSet('Disable', 'Restore')]

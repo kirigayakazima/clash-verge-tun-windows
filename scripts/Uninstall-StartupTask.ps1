@@ -1,4 +1,4 @@
-# Unregister Windows Scheduled Task for Clash Verge TUN Auto Repair.
+﻿# Unregister Windows Scheduled Task for Clash Verge TUN Auto Repair.
 [CmdletBinding()]
 param()
 

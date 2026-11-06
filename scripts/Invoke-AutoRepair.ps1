@@ -1,4 +1,4 @@
-# Automated non-interactive TUN repair.
+﻿# Automated non-interactive TUN repair.
 # Automatically detects physical uplink, disables IPv4 forwarding,
 # resets TUN if active, and verifies domestic DIRECT routing.
 [CmdletBinding()]
@@ -96,13 +96,24 @@ if ($tunActive) {
 }
 
 # 4. Ensure domestic group is DIRECT in profiles.yaml and runtime
-$configDir = Join-Path $env:APPDATA 'io.github.clash-verge-rev.clash-verge-rev'
-$profilesPath = Join-Path $configDir 'profiles.yaml'
-if (Test-Path -LiteralPath $profilesPath) {
-    $content = Get-Content -LiteralPath $profilesPath -Raw -Encoding UTF8
-    if ($content -match 'name:\s*.*国内网站\s*\r?\n\s*now:\s*(?!DIRECT\b)') {
-        $newContent = [regex]::Replace($content, '(name:\s*.*国内网站\s*\r?\n\s*now:\s*)(.+)', '${1}DIRECT')
-        Set-Content -LiteralPath $profilesPath -Value $newContent -Encoding UTF8
+$profilesTargets = @()
+$defaultConfigDir = Join-Path $env:APPDATA 'io.github.clash-verge-rev.clash-verge-rev'
+$profilesTargets += Join-Path $defaultConfigDir 'profiles.yaml'
+if ($env:USERPROFILE -match 'systemprofile') {
+    $userDirs = @(Get-ChildItem 'C:\Users' -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch '(?i)Public|Default|All Users|systemprofile' })
+    foreach ($u in $userDirs) {
+        $p = Join-Path $u.FullName 'AppData\Roaming\io.github.clash-verge-rev.clash-verge-rev\profiles.yaml'
+        if (Test-Path -LiteralPath $p) { $profilesTargets += $p }
+    }
+}
+foreach ($profilesPath in ($profilesTargets | Select-Object -Unique)) {
+    if (Test-Path -LiteralPath $profilesPath) {
+        $content = Get-Content -LiteralPath $profilesPath -Raw -Encoding UTF8
+        if ($content -match 'name:\s*.*国内网站\s*\r?\n\s*now:\s*(?!DIRECT\b)') {
+            $newContent = [regex]::Replace($content, '(name:\s*.*国内网站\s*\r?\n\s*now:\s*)(.+)', '${1}DIRECT')
+            Set-Content -LiteralPath $profilesPath -Value $newContent -Encoding UTF8
+        }
     }
 }
 try {

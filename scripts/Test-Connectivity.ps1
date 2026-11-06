@@ -1,4 +1,4 @@
-# Read-only HTTP checks with the explicit application proxy bypassed.
+﻿# Read-only HTTP checks with the explicit application proxy bypassed.
 [CmdletBinding()]
 param()
 
