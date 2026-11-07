@@ -16,13 +16,13 @@ if (-not (Test-Path -LiteralPath $logDir)) {
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 Write-Host "==================================================================" -ForegroundColor Cyan
-Write-Host "🔍 物理网卡转发篡改实时侦听雷达 (Intrusion Detection Radar)" -ForegroundColor Cyan
+Write-Host "🔍 物理网卡转发篡改实时侦听雷达 (静默守护模式)" -ForegroundColor Cyan
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host "  - 监控网卡: $InterfaceAlias"
 Write-Host "  - 探测频率: 每 ${IntervalMs} 毫秒"
-Write-Host "  - 管理员权限: $(if ($isAdmin) { '已具备 (支持自动压制与全量进程透视)' } else { '普通权限 (建议以管理员运行以捕获完整进程信息)' })"
-Write-Host "  - 自动压制: $(if ($AutoSuppress) { '开启 (抓拍到证据后立即压制为 Disabled)' } else { '关闭 (仅抓拍不修改)' })"
-Write-Host "==================================================================`n" -ForegroundColor Cyan
+Write-Host "  - 自动压制: 开启 (抓拍到篡改瞬间立即自动锁死为 Disabled)"
+Write-Host "  - 终端模式: 纯静默守护 (状态正常为 Disabled 时不打印任何刷屏内容)"
+Write-Host "==================================================================" -ForegroundColor Cyan
 
 # Check initial status
 $current = Get-NetIPInterface -InterfaceAlias $InterfaceAlias -AddressFamily IPv4 -ErrorAction SilentlyContinue
@@ -39,33 +39,29 @@ if (-not $current) {
 }
 
 if ($current.Forwarding -eq 'Enabled') {
-    Write-Host "⚠️ [初始状态异常] 当前 $InterfaceAlias 的 IPv4 转发已经是 Enabled！" -ForegroundColor Yellow
+    Write-Host "⚠️ [检测到当前异常] $InterfaceAlias 当前转发已是 Enabled！" -ForegroundColor Yellow
     if ($isAdmin -and $AutoSuppress) {
-        Write-Host "🔧 正在将其重置为 Disabled 以开启侦听..." -ForegroundColor Yellow
+        Write-Host "🔧 正在自动重置为 Disabled 并开启静默守护..." -ForegroundColor Yellow
         Set-NetIPInterface -InterfaceAlias $InterfaceAlias -AddressFamily IPv4 -Forwarding Disabled -PolicyStore ActiveStore -ErrorAction SilentlyContinue
+        Set-NetIPInterface -InterfaceAlias $InterfaceAlias -AddressFamily IPv4 -Forwarding Disabled -PolicyStore PersistentStore -ErrorAction SilentlyContinue
         Start-Sleep -Milliseconds 300
     }
 }
 
-Write-Host "🚀 实时监控已启动！按 Ctrl+C 可随时停止监控并退出。`n" -ForegroundColor Green
+Write-Host "🟢 静默守护中... (保持此窗口开启即可，平时 0 刷屏 0 消耗；一旦被改会立即警报取证并秒级压制)" -ForegroundColor Green
+Write-Host "ℹ️  按 Ctrl+C 可停止侦听退出。`n" -ForegroundColor DarkGray
 
 $lastState = (Get-NetIPInterface -InterfaceAlias $InterfaceAlias -AddressFamily IPv4).Forwarding
-$loopCount = 0
 
 while ($true) {
     Start-Sleep -Milliseconds $IntervalMs
-    $loopCount++
 
     $now = Get-Date
     $cur = Get-NetIPInterface -InterfaceAlias $InterfaceAlias -AddressFamily IPv4 -ErrorAction SilentlyContinue
     if (-not $cur) { continue }
     $currentState = $cur.Forwarding
 
-    # Print heartbeat every 5 seconds (10 loops at 500ms)
-    if ($loopCount % 10 -eq 0) {
-        $statusColor = if ($currentState -eq 'Disabled') { 'DarkGray' } else { 'Red' }
-        Write-Host ("[{0}] 正在侦听 {1}... 当前转发状态: [{2}]" -f $now.ToString('HH:mm:ss'), $InterfaceAlias, $currentState) -ForegroundColor $statusColor
-    }
+    # Pure silence when Disabled: No print, no refresh, near zero CPU
 
     # TRIGGER: When state flips from Disabled to Enabled
     if ($lastState -eq 'Disabled' -and $currentState -eq 'Enabled') {
@@ -77,7 +73,7 @@ while ($true) {
         Write-Host "🚨 警报！捕获到网卡 IPv4 转发被篡改现场！" -ForegroundColor Red
         Write-Host "  - 捕获时刻: $timestampStr" -ForegroundColor Yellow
         Write-Host "  - 目标网卡: $InterfaceAlias" -ForegroundColor Yellow
-        Write-Host "  - 状态变化: Disabled  ===>  Enabled (已反弹)" -ForegroundColor Red
+        Write-Host "  - 状态变化: Disabled  ===>  Enabled (已被篡改)" -ForegroundColor Red
         Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`n" -ForegroundColor Red
 
         # 1. Inspect suspected processes
@@ -133,10 +129,12 @@ while ($true) {
         $reportLines | Out-File -LiteralPath $reportFile -Encoding UTF8
         Write-Host "`n📄 完整现场报告已写入: $reportFile" -ForegroundColor Green
 
-        # 5. Auto suppression if enabled
+        # 5. Immediate auto suppression
         if ($isAdmin -and $AutoSuppress) {
             Set-NetIPInterface -InterfaceAlias $InterfaceAlias -AddressFamily IPv4 -Forwarding Disabled -PolicyStore ActiveStore -ErrorAction SilentlyContinue
-            Write-Host "🛡️ [自愈机制] 已即时将 $InterfaceAlias 的 IPv4 转发重新锁死为 Disabled！`n" -ForegroundColor Green
+            Set-NetIPInterface -InterfaceAlias $InterfaceAlias -AddressFamily IPv4 -Forwarding Disabled -PolicyStore PersistentStore -ErrorAction SilentlyContinue
+            Write-Host "`n🛡️ [自动压制完成] 已秒级将 $InterfaceAlias 的 IPv4 转发重新锁死为 Disabled！" -ForegroundColor Green
+            Write-Host "🟢 现场取证完成，已恢复静默侦听...`n" -ForegroundColor Green
             $currentState = 'Disabled'
         } else {
             Write-Host "ℹ️ 提示: 未开启自动压制或无管理员权限，网卡保持 Enabled。`n" -ForegroundColor Yellow
