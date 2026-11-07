@@ -123,6 +123,7 @@ while ($true) {
     Write-Host '5. 测试国内外连通性'
     Write-Host '6. 🚀 安装 Windows 开机静默自愈任务 (彻底免手动)'
     Write-Host '7. 卸载 Windows 开机自愈任务'
+    Write-Host '8. 🕵️ 实时侦听雷达：监测是谁在把转发改成 Enabled (现场抓贼)'
     Write-Host '0. 退出'
     $choice = Read-Host '输入编号'
     try {
@@ -134,8 +135,9 @@ while ($true) {
             '5' { & (Join-Path $PSScriptRoot 'scripts\Test-Connectivity.ps1') }
             '6' { & (Join-Path $PSScriptRoot 'scripts\Install-StartupTask.ps1') }
             '7' { & (Join-Path $PSScriptRoot 'scripts\Uninstall-StartupTask.ps1') }
+            '8' { & (Join-Path $PSScriptRoot 'scripts\Watch-ForwardingChanges.ps1') }
             '0' { return }
-            default { Write-Host '请输入 0 到 7。' }
+            default { Write-Host '请输入 0 到 8。' }
         }
     } catch {
         Write-Host ("操作未完成：{0}" -f $_.Exception.Message) -ForegroundColor Red
